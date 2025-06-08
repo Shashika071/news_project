@@ -4,6 +4,7 @@ using System.Text;
 using CozyComfort.API.Data;
 using CozyComfort.API.Models;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
 
 namespace CozyComfort.API.Services
 {

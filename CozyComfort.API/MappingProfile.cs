@@ -28,7 +28,6 @@ namespace CozyComfort.API
             CreateMap<DistributorOrderItem, DistributorOrderItemResponseDTO>();
             CreateMap<DistributorOrderItemDTO, DistributorOrderItem>();
 
-            // Manufacturer order mappings
             CreateMap<ManufacturerOrder, ManufacturerOrderResponseDTO>();
             CreateMap<ManufacturerOrderDTO, ManufacturerOrder>();
             CreateMap<ManufacturerOrderItem, ManufacturerOrderItemResponseDTO>();

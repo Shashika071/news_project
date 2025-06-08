@@ -3,6 +3,7 @@ using CozyComfort.API.Services;
 using CozyComfort.API.DTOs;
 using CozyComfort.API.Models;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace CozyComfort.API.Controllers
 {

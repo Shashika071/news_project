@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using CozyComfort.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,6 +69,28 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Check database connection and print message
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    try
+    {
+        if (context.Database.CanConnect())
+        {
+            Console.WriteLine("Successfully connected to the database!");
+        }
+        else
+        {
+            Console.WriteLine("Failed to connect to the database.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error connecting to the database: {ex.Message}");
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
