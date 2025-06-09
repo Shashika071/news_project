@@ -20,6 +20,9 @@ namespace CozyComfort.API.Models
         [Required]
         public string PasswordHash { get; set; }
         
+        [Required]
+        public byte[] PasswordSalt { get; set; } 
+        
         [ForeignKey("Role")]
         public int RoleId { get; set; }
         public Role Role { get; set; }

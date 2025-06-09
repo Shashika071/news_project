@@ -28,9 +28,14 @@ namespace CozyComfort.API.Services
 
         public async Task<User> Register(User user, string password)
         {
-            CreatePasswordHash(password, out byte[] passwordHash);
-            user.PasswordHash = Convert.ToBase64String(passwordHash);
-            
+            if (await UserExists(user.Username))
+                throw new Exception("Username already exists");
+
+      using var hmac = new System.Security.Cryptography.HMACSHA512();
+user.PasswordSalt = hmac.Key;
+user.PasswordHash = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(password)));
+
+
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
             
@@ -43,7 +48,7 @@ namespace CozyComfort.API.Services
                 .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.Username == username);
 
-            if (user == null || !VerifyPasswordHash(password, Convert.FromBase64String(user.PasswordHash)))
+            if (user == null || !VerifyPasswordHash(password, user.PasswordHash, user.PasswordSalt))
                 return null;
 
             return GenerateJwtToken(user);
@@ -54,18 +59,16 @@ namespace CozyComfort.API.Services
             return await _context.Users.AnyAsync(u => u.Username == username);
         }
 
-        private void CreatePasswordHash(string password, out byte[] passwordHash)
-        {
-            using var hmac = new System.Security.Cryptography.HMACSHA512();
-            passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-        }
+       private bool VerifyPasswordHash(string password, string storedHash, byte[] storedSalt)
+{
+    var computedHash = new System.Security.Cryptography.HMACSHA512(storedSalt)
+        .ComputeHash(Encoding.UTF8.GetBytes(password));
 
-        private bool VerifyPasswordHash(string password, byte[] storedHash)
-        {
-            using var hmac = new System.Security.Cryptography.HMACSHA512();
-            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return computedHash.SequenceEqual(storedHash);
-        }
+    var originalHash = Convert.FromBase64String(storedHash);
+
+    return computedHash.SequenceEqual(originalHash);
+}
+
 
         private string GenerateJwtToken(User user)
         {
@@ -73,11 +76,11 @@ namespace CozyComfort.API.Services
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.Name)
+                new Claim(ClaimTypes.Role, user.Role?.Name ?? "User")
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8
-                .GetBytes(_configuration.GetSection("Jwt:Key").Value));
+                .GetBytes(_configuration["Jwt:Key"]));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
 

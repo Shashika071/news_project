@@ -1,16 +1,16 @@
+// Context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
+// Layouts
 import AuthLayout from './components/layout/AuthLayout';
-import CssBaseline from '@mui/material/CssBaseline';
+import { CssBaseline } from '@mui/material';
 import CustomerShop from './pages/customer/Shop';
 import DistributorDashboard from './pages/distributor/Dashboard';
-// Auth pages
+// Pages
 import Login from './pages/auth/Login';
-// Layout components
 import MainLayout from './components/layout/MainLayout';
-// Role-based pages
 import ManufacturerDashboard from './pages/manufacturer/Dashboard';
 import Register from './pages/auth/Register';
 import SellerDashboard from './pages/seller/Dashboard';
@@ -32,8 +32,8 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Toaster position="top-right" />
-      <AuthProvider>
-        <Router>
+      <Router>
+        <AuthProvider>
           <Routes>
             {/* Auth routes */}
             <Route path="/auth" element={<AuthLayout />}>
@@ -50,70 +50,74 @@ const App = () => {
               <Route path="shop" element={<CustomerShop />} />
             </Route>
           </Routes>
-        </Router>
-      </AuthProvider>
+        </AuthProvider>
+      </Router>
     </ThemeProvider>
   );
 };
 
+// Redirect based on role
 const HomeRedirect = () => {
   const { user } = useAuth();
-  
-  if (!user) return <Navigate to="/auth/login" />;
-  
-  switch(user.role) {
+
+  if (!user) return <Navigate to="/auth/login" replace />;
+
+  switch (user.role) {
     case 'Manufacturer':
-      return <Navigate to="/manufacturer/dashboard" />;
+      return <Navigate to="/manufacturer/dashboard" replace />;
     case 'Distributor':
-      return <Navigate to="/distributor/dashboard" />;
+      return <Navigate to="/distributor/dashboard" replace />;
     case 'Seller':
-      return <Navigate to="/seller/dashboard" />;
+      return <Navigate to="/seller/dashboard" replace />;
     default:
-      return <Navigate to="/shop" />;
+      return <Navigate to="/shop" replace />;
   }
 };
 
+// Manufacturer routes
 const ManufacturerRoutes = () => {
   const { user } = useAuth();
-  
+
   if (user?.role !== 'Manufacturer') {
-    return <Navigate to="/auth/login" />;
+    return <Navigate to="/auth/login" replace />;
   }
 
   return (
     <Routes>
       <Route path="dashboard" element={<ManufacturerDashboard />} />
-      {/* Add more manufacturer routes as needed */}
+      {/* Add more manufacturer routes here */}
     </Routes>
   );
 };
 
+// Distributor routes
 const DistributorRoutes = () => {
   const { user } = useAuth();
-  
+
   if (user?.role !== 'Distributor') {
-    return <Navigate to="/auth/login" />;
+    return <Navigate to="/auth/login" replace />;
   }
 
   return (
     <Routes>
       <Route path="dashboard" element={<DistributorDashboard />} />
-      {/* Add more distributor routes as needed */}
+      {/* Add more distributor routes here */}
     </Routes>
   );
 };
 
+// Seller routes
 const SellerRoutes = () => {
   const { user } = useAuth();
-  
+
   if (user?.role !== 'Seller') {
-    return <Navigate to="/auth/login" />;
+    return <Navigate to="/auth/login" replace />;
   }
 
   return (
     <Routes>
       <Route path="dashboard" element={<SellerDashboard />} />
-      {/* Add more seller routes as needed */}
+      {/* Add more seller routes here */}
     </Routes>
   );
 };
