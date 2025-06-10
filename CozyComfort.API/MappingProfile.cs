@@ -7,7 +7,10 @@ namespace CozyComfort.API
     public class MappingProfile : Profile
     {
         public MappingProfile()
-        {
+        {  
+         
+            CreateMap<User, UserDTO>()
+    .ForMember(dest => dest.Role, opt => opt.MapFrom(src => src.Role.Name));
             // User mappings
             CreateMap<RegisterDTO, User>();
             CreateMap<User, UserDTO>();

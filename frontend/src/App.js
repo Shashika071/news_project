@@ -5,6 +5,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // Layouts
 import AuthLayout from './components/layout/AuthLayout';
+import CreateDistributorOrder from './pages/seller/CreateDistributorOrder';
 import { CssBaseline } from '@mui/material';
 import CustomerShop from './pages/customer/Shop';
 import DistributorDashboard from './pages/distributor/Dashboard';
@@ -119,7 +120,7 @@ const SellerRoutes = () => {
 
   return (
     <Routes>
-      <Route path="dashboard" element={<SellerDashboard />} />
+      <Route path="dashboard" element={<CreateDistributorOrder />} />
       {/* Add more seller routes here */}
     </Routes>
   );

@@ -20,7 +20,7 @@ export const updateManufacturerInventory = async (blanketModelId, quantity) => {
 };
 
 export const updateDistributorInventory = async (blanketModelId, quantity) => {
-  await apiClient.put(`/inventory/distributor/${blanketModelId}`, quantity);
+  await apiClient.put(`/inventory/distributor/${blanketModelId}`, { quantity });
 };
 
 export const updateSellerInventory = async (blanketModelId, quantity) => {

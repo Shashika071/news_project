@@ -19,8 +19,8 @@ namespace CozyComfort.API.Data
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<ProductionCapacity> ProductionCapacities { get; set; }
         public DbSet<DistributorOrder> DistributorOrders { get; set; }
-public DbSet<ManufacturerOrder> ManufacturerOrders { get; set; }
-public DbSet<DistributorOrderItem> DistributorOrderItems { get; set; }
+        public DbSet<ManufacturerOrder> ManufacturerOrders { get; set; }
+        public DbSet<DistributorOrderItem> DistributorOrderItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

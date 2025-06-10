@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CozyComfort.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+af4e85b501fe9a476d996131f3901a4686ae1124")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+118c016e49ba52773e87d4160bb4399c435d5e67")]
 [assembly: System.Reflection.AssemblyProductAttribute("CozyComfort.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CozyComfort.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

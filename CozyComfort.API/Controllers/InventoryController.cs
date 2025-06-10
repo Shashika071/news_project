@@ -34,24 +34,38 @@ namespace CozyComfort.API.Controllers
                 })
                 .ToListAsync();
         }
+        public class InventoryDTO
+{
+    public int BlanketModelId { get; set; }
+    public string BlanketModelName { get; set; }
+    public int Quantity { get; set; }
 
-        [HttpGet("distributor")]
-        [Authorize(Roles = "Distributor")]
-        public async Task<ActionResult<IEnumerable<InventoryDTO>>> GetDistributorInventory()
+    public decimal ManufacturerPrice { get; set; }
+    public decimal RetailPrice { get; set; }
+    public string ImageUrl { get; set; }
+}
+
+[HttpGet("distributor")]
+[Authorize(Roles = "Distributor")]
+public async Task<ActionResult<IEnumerable<InventoryDTO>>> GetDistributorInventory()
+{
+    var distributorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+
+    return await _context.DistributorInventories
+        .Include(di => di.BlanketModel)
+        .Where(di => di.DistributorId == distributorId && di.BlanketModel.IsActive)
+        .Select(di => new InventoryDTO
         {
-            var distributorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            BlanketModelId = di.BlanketModelId,
+            BlanketModelName = di.BlanketModel.Name,
+            Quantity = di.Quantity,
+            ManufacturerPrice = di.BlanketModel.ManufacturerPrice,
+            RetailPrice = di.BlanketModel.RetailPrice,
+            ImageUrl = di.BlanketModel.ImageUrl
+        })
+        .ToListAsync();
+}
 
-            return await _context.DistributorInventories
-                .Include(di => di.BlanketModel)
-                .Where(di => di.DistributorId == distributorId && di.BlanketModel.IsActive)
-                .Select(di => new InventoryDTO
-                {
-                    BlanketModelId = di.BlanketModelId,
-                    BlanketModelName = di.BlanketModel.Name,
-                    Quantity = di.Quantity
-                })
-                .ToListAsync();
-        }
 
         [HttpGet("seller")]
         [Authorize(Roles = "Seller")]
@@ -95,29 +109,33 @@ public async Task<IActionResult> UpdateManufacturerInventory(int blanketModelId,
 
     return NoContent();
 }
+        public class UpdateQuantityDto
+{
+    public int Quantity { get; set; }
+}
 
 
-        [HttpPut("distributor/{blanketModelId}")]
-        [Authorize(Roles = "Distributor")]
-        public async Task<IActionResult> UpdateDistributorInventory(int blanketModelId, [FromBody] int quantity)
-        {
-            var distributorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+       [HttpPut("distributor/{blanketModelId}")]
+[Authorize(Roles = "Distributor")]
+public async Task<IActionResult> UpdateDistributorInventory(int blanketModelId, [FromBody] UpdateQuantityDto dto)
+{
+    var distributorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
 
-            var inventory = await _context.DistributorInventories
-                .FirstOrDefaultAsync(di => di.DistributorId == distributorId && di.BlanketModelId == blanketModelId);
+    var inventory = await _context.DistributorInventories
+        .FirstOrDefaultAsync(di => di.DistributorId == distributorId && di.BlanketModelId == blanketModelId);
 
-            if (inventory == null)
-            {
-                return NotFound();
-            }
+    if (inventory == null)
+    {
+        return NotFound();
+    }
 
-            inventory.Quantity = quantity;
-            inventory.LastUpdated = DateTime.UtcNow;
+    inventory.Quantity = dto.Quantity;
+    inventory.LastUpdated = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+    await _context.SaveChangesAsync();
 
-            return NoContent();
-        }
+    return NoContent();
+}
 
         [HttpPut("seller/{blanketModelId}")]
         [Authorize(Roles = "Seller")]

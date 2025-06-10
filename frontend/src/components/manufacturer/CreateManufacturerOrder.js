@@ -4,11 +4,9 @@ import { createManufacturerOrder } from '../../api/manufacturerOrderService';
 import { getBlanketModels } from '../../api/blanketService';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
-const CreateManufacturerOrder = () => {
+const CreateManufacturerOrder = ({ onClose, onOrderCreated }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [blanketModels, setBlanketModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderItems, setOrderItems] = useState([]);
@@ -64,31 +62,45 @@ const CreateManufacturerOrder = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (orderItems.length === 0) {
-    toast.error('Please add at least one item to the order');
-    return;
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (orderItems.length === 0) {
+      toast.error('Please add at least one item to the order');
+      return;
+    }
 
-  try {
-    const orderData = {
-      distributorId: user.id,
-      orderItems: orderItems.map(item => ({
-        blanketModelId: item.blanketModelId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice
-      }))
-    };
+    try {
+      const orderData = {
+        distributorId: user.id,
+        orderItems: orderItems.map(item => ({
+          blanketModelId: item.blanketModelId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice
+        }))
+      };
 
-    await createManufacturerOrder(orderData);
-    toast.success('Order created successfully');
-    navigate('/manufacturer-orders');
-  } catch (error) {
-    toast.error(error.response?.data?.message || 'Failed to create order');
-    console.error(error);
-  }
-};
+      const response = await createManufacturerOrder(orderData);
+      toast.success('Order created successfully');
+      
+      // Call the onOrderCreated callback if provided
+      if (onOrderCreated) {
+        onOrderCreated(response);
+      }
+      
+      // Close the popup
+      if (onClose) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Full error object:', error);
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          'Failed to create order';
+      toast.error(errorMessage);
+    }
+  };
 
   if (loading) {
     return (
@@ -102,11 +114,17 @@ const CreateManufacturerOrder = () => {
 
   return (
     <div className="card shadow-sm">
-      <div className="card-header bg-primary text-white">
+      <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h3 className="mb-0">Create New Manufacturer Order</h3>
+        <button 
+          type="button" 
+          className="btn-close btn-close-white" 
+          onClick={onClose}
+          aria-label="Close"
+        />
       </div>
       <div className="card-body">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="row mb-4">
             <div className="col-md-4">
               <label className="form-label">Blanket Model</label>
@@ -114,7 +132,6 @@ const CreateManufacturerOrder = () => {
                 className="form-select"
                 value={currentItem.blanketModelId}
                 onChange={(e) => setCurrentItem({...currentItem, blanketModelId: e.target.value})}
-                required
               >
                 <option value="">Select a model</option>
                 {blanketModels.map(model => (
@@ -132,7 +149,6 @@ const CreateManufacturerOrder = () => {
                 min="1"
                 value={currentItem.quantity}
                 onChange={(e) => setCurrentItem({...currentItem, quantity: e.target.value})}
-                required
               />
             </div>
             <div className="col-md-2 d-flex align-items-end">
@@ -200,11 +216,15 @@ const CreateManufacturerOrder = () => {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => navigate('/manufacturer-orders')}
+              onClick={onClose}
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-success">
+            <button 
+              type="submit" 
+              className="btn btn-success"
+              disabled={orderItems.length === 0}
+            >
               Submit Order
             </button>
           </div>

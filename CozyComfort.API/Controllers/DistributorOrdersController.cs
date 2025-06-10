@@ -196,113 +196,163 @@ namespace CozyComfort.API.Controllers
                 }).ToList()
             });
         }
+// Add this to your Models/DTOs folder
+public class StatusUpdateDto
+{
+    public string Status { get; set; }
+}
+       [HttpPut("{id}/status")]
+public async Task<IActionResult> UpdateDistributorOrderStatus(int id, [FromBody] StatusUpdateDto statusDto)
+{
+    if (statusDto == null || string.IsNullOrEmpty(statusDto.Status))
+    {
+        return BadRequest("Status is required");
+    }
 
-        [HttpPut("{id}/status")]
-        public async Task<IActionResult> UpdateDistributorOrderStatus(int id, [FromBody] string status)
+    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+    var role = User.FindFirst(ClaimTypes.Role).Value;
+
+    var order = await _context.DistributorOrders
+        .Include(o => o.OrderItems)
+        .FirstOrDefaultAsync(o => o.Id == id);
+
+    if (order == null)
+    {
+        return NotFound();
+    }
+
+    // Authorization check
+    if ((role == "Seller" && order.SellerId != userId) ||
+        (role == "Distributor" && order.DistributorId != userId))
+    {
+        return Forbid();
+    }
+
+    // Validate status transition
+    var validTransitions = new Dictionary<string, List<string>>
+    {
+        ["Pending"] = new List<string> { "Processing", "Cancelled" },
+        ["Processing"] = new List<string> { "Shipped", "Cancelled" },
+        ["Shipped"] = new List<string> { "Delivered" }
+    };
+
+    if (!validTransitions.ContainsKey(order.Status) || 
+        !validTransitions[order.Status].Contains(statusDto.Status))
+    {
+        return BadRequest($"Invalid status transition from {order.Status} to {statusDto.Status}");
+    }
+
+    // Store original status for comparison
+    var originalStatus = order.Status;
+    order.Status = statusDto.Status;
+    
+    await _context.SaveChangesAsync();
+
+    // Process based on new status
+    if (role == "Distributor" && statusDto.Status == "Processing")
+    {
+        await ProcessDistributorOrder(order);
+    }
+    else if (statusDto.Status == "Delivered")
+    {
+        await UpdateSellerInventory(order);
+    }
+
+    return NoContent();
+}
+
+private async Task UpdateSellerInventory(DistributorOrder order)
+{
+    var orderItems = await _context.DistributorOrderItems
+        .Where(oi => oi.DistributorOrderId == order.Id)
+        .ToListAsync();
+
+    foreach (var item in orderItems)
+    {
+        // Find or create seller inventory record
+        var sellerInventory = await _context.SellerInventories
+            .FirstOrDefaultAsync(si => si.SellerId == order.SellerId && 
+                                     si.BlanketModelId == item.BlanketModelId);
+
+        if (sellerInventory == null)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var role = User.FindFirst(ClaimTypes.Role).Value;
-
-            var order = await _context.DistributorOrders.FindAsync(id);
-            if (order == null)
+            sellerInventory = new SellerInventory
             {
-                return NotFound();
-            }
-
-            // Authorization check
-            if ((role == "Seller" && order.SellerId != userId) ||
-                (role == "Distributor" && order.DistributorId != userId))
-            {
-                return Forbid();
-            }
-
-            // Validate status transition
-            var validTransitions = new Dictionary<string, List<string>>
-            {
-                ["Pending"] = new List<string> { "Processing", "Cancelled" },
-                ["Processing"] = new List<string> { "Shipped", "Cancelled" },
-                ["Shipped"] = new List<string> { "Delivered" }
+                SellerId = order.SellerId,
+                BlanketModelId = item.BlanketModelId,
+                Quantity = item.Quantity,
+                LastUpdated = DateTime.UtcNow
             };
-
-            if (!validTransitions.ContainsKey(order.Status) || 
-                !validTransitions[order.Status].Contains(status))
-            {
-                return BadRequest("Invalid status transition");
-            }
-
-            order.Status = status;
-            await _context.SaveChangesAsync();
-
-            // If order is being processed, check inventory and potentially create manufacturer order
-            if (role == "Distributor" && status == "Processing")
-            {
-                await ProcessDistributorOrder(order);
-            }
-
-            return NoContent();
+            _context.SellerInventories.Add(sellerInventory);
         }
-
-        private async Task ProcessDistributorOrder(DistributorOrder order)
+        else
         {
-            var orderItems = await _context.DistributorOrderItems
-                .Include(oi => oi.BlanketModel)
-                .Where(oi => oi.DistributorOrderId == order.Id)
-                .ToListAsync();
-
-            var insufficientInventoryItems = new List<DistributorOrderItem>();
-            var manufacturerOrderItems = new List<ManufacturerOrderItemDTO>();
-
-            foreach (var item in orderItems)
-            {
-                var distributorInventory = await _context.DistributorInventories
-                    .FirstOrDefaultAsync(di => di.DistributorId == order.DistributorId && 
-                                              di.BlanketModelId == item.BlanketModelId);
-
-                if (distributorInventory == null || distributorInventory.Quantity < item.Quantity)
-                {
-                    insufficientInventoryItems.Add(item);
-                    var neededQuantity = item.Quantity - (distributorInventory?.Quantity ?? 0);
-                    manufacturerOrderItems.Add(new ManufacturerOrderItemDTO
-                    {
-                        BlanketModelId = item.BlanketModelId,
-                        Quantity = neededQuantity,
-                        UnitPrice = item.BlanketModel.ManufacturerPrice
-                    });
-                }
-            }
-
-            if (manufacturerOrderItems.Count > 0)
-            {
-                // Create manufacturer order for insufficient items
-                var manufacturerOrder = new ManufacturerOrderDTO
-                {
-                    DistributorId = order.DistributorId,
-                    OrderItems = manufacturerOrderItems
-                };
-
-                // This would call the ManufacturerOrdersController's PostManufacturerOrder action
-                // In a real application, you might use an internal service or mediator pattern
-                // For simplicity, we'll directly create the order here
-                var orderNumber = $"MORD-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}";
-
-                var newManufacturerOrder = new ManufacturerOrder
-                {
-                    OrderNumber = orderNumber,
-                    OrderDate = DateTime.UtcNow,
-                    DistributorId = manufacturerOrder.DistributorId,
-                    Status = "Pending",
-                    TotalAmount = manufacturerOrder.OrderItems.Sum(oi => oi.Quantity * oi.UnitPrice),
-                    OrderItems = manufacturerOrder.OrderItems.Select(oi => new ManufacturerOrderItem
-                    {
-                        BlanketModelId = oi.BlanketModelId,
-                        Quantity = oi.Quantity,
-                        UnitPrice = oi.UnitPrice
-                    }).ToList()
-                };
-
-                _context.ManufacturerOrders.Add(newManufacturerOrder);
-                await _context.SaveChangesAsync();
-            }
+            sellerInventory.Quantity += item.Quantity;
+            sellerInventory.LastUpdated = DateTime.UtcNow;
         }
+    }
+
+    await _context.SaveChangesAsync();
+}
+
+private async Task ProcessDistributorOrder(DistributorOrder order)
+{
+    var orderItems = await _context.DistributorOrderItems
+        .Include(oi => oi.BlanketModel)
+        .Where(oi => oi.DistributorOrderId == order.Id)
+        .ToListAsync();
+
+    var insufficientInventoryItems = new List<DistributorOrderItem>();
+    var manufacturerOrderItems = new List<ManufacturerOrderItemDTO>();
+
+    foreach (var item in orderItems)
+    {
+        var distributorInventory = await _context.DistributorInventories
+            .FirstOrDefaultAsync(di => di.DistributorId == order.DistributorId && 
+                                      di.BlanketModelId == item.BlanketModelId);
+
+        if (distributorInventory == null || distributorInventory.Quantity < item.Quantity)
+        {
+            insufficientInventoryItems.Add(item);
+            var neededQuantity = item.Quantity - (distributorInventory?.Quantity ?? 0);
+            manufacturerOrderItems.Add(new ManufacturerOrderItemDTO
+            {
+                BlanketModelId = item.BlanketModelId,
+                Quantity = neededQuantity,
+                UnitPrice = item.BlanketModel.ManufacturerPrice
+            });
+        }
+    }
+
+    if (manufacturerOrderItems.Count > 0)
+    {
+        // Create manufacturer order for insufficient items
+        var manufacturerOrder = new ManufacturerOrderDTO
+        {
+            DistributorId = order.DistributorId,
+            OrderItems = manufacturerOrderItems
+        };
+
+        var orderNumber = $"MORD-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}";
+
+        var newManufacturerOrder = new ManufacturerOrder
+        {
+            OrderNumber = orderNumber,
+            OrderDate = DateTime.UtcNow,
+            DistributorId = manufacturerOrder.DistributorId,
+            Status = "Pending",
+            TotalAmount = manufacturerOrder.OrderItems.Sum(oi => oi.Quantity * oi.UnitPrice),
+            OrderItems = manufacturerOrder.OrderItems.Select(oi => new ManufacturerOrderItem
+            {
+                BlanketModelId = oi.BlanketModelId,
+                Quantity = oi.Quantity,
+                UnitPrice = oi.UnitPrice
+            }).ToList()
+        };
+
+        _context.ManufacturerOrders.Add(newManufacturerOrder);
+        await _context.SaveChangesAsync();
+    }
+}
     }
 }
