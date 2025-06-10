@@ -9,11 +9,13 @@ import CreateDistributorOrder from './pages/seller/CreateDistributorOrder';
 import { CssBaseline } from '@mui/material';
 import CustomerShop from './pages/customer/Shop';
 import DistributorDashboard from './pages/distributor/Dashboard';
+import InventoryForm from './components/seller/InventoryForm';
 // Pages
 import Login from './pages/auth/Login';
 import MainLayout from './components/layout/MainLayout';
 import ManufacturerDashboard from './pages/manufacturer/Dashboard';
 import ManufacturerOrderDetails from './components/manufacturer/ManufacturerOrderDetails';
+import OrderDetail from './components/seller/OrderDetail';
 import Register from './pages/auth/Register';
 import SellerDashboard from './pages/seller/Dashboard';
 import { Toaster } from 'react-hot-toast';
@@ -120,8 +122,10 @@ const SellerRoutes = () => {
 
   return (
     <Routes>
-      <Route path="dashboard" element={<CreateDistributorOrder />} />
-      {/* Add more seller routes here */}
+      <Route path="dashboard" element={<SellerDashboard />} />
+       <Route path="/seller/orders/:id" element={<OrderDetail />} />
+       <Route path="/seller/inventory/:id/edit" element={<InventoryForm />} />
+       <Route path="/seller/orders/create" element={<CreateDistributorOrder />} />
     </Routes>
   );
 };

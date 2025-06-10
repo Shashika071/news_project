@@ -17,10 +17,13 @@ export const createOrder = async (orderData) => {
 };
 
 export const updateOrderStatus = async (id, status) => {
-  const response = await apiClient.put(`/orders/${id}/status`, { status });
+  const response = await apiClient.put(`/orders/${id}/status`, status, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
   return response.data;
 };
-
 // Distributor Orders
 export const getDistributorOrders = async () => {
   const response = await apiClient.get('/distributororders');

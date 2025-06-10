@@ -197,11 +197,13 @@ namespace CozyComfort.API.Controllers
             });
         }
 // Add this to your Models/DTOs folder
+// Add this to your Models/DTOs folder
 public class StatusUpdateDto
 {
     public string Status { get; set; }
 }
-       [HttpPut("{id}/status")]
+
+[HttpPut("{id}/status")]
 public async Task<IActionResult> UpdateDistributorOrderStatus(int id, [FromBody] StatusUpdateDto statusDto)
 {
     if (statusDto == null || string.IsNullOrEmpty(statusDto.Status))
@@ -256,6 +258,7 @@ public async Task<IActionResult> UpdateDistributorOrderStatus(int id, [FromBody]
     else if (statusDto.Status == "Delivered")
     {
         await UpdateSellerInventory(order);
+        await ReduceDistributorInventory(order); // Add this new method call
     }
 
     return NoContent();
@@ -295,6 +298,37 @@ private async Task UpdateSellerInventory(DistributorOrder order)
     await _context.SaveChangesAsync();
 }
 
+private async Task ReduceDistributorInventory(DistributorOrder order)
+{
+    var orderItems = await _context.DistributorOrderItems
+        .Where(oi => oi.DistributorOrderId == order.Id)
+        .ToListAsync();
+
+    foreach (var item in orderItems)
+    {
+        var distributorInventory = await _context.DistributorInventories
+            .FirstOrDefaultAsync(di => di.DistributorId == order.DistributorId && 
+                                    di.BlanketModelId == item.BlanketModelId);
+
+        if (distributorInventory != null)
+        {
+            // Reduce the distributor's inventory quantity
+            distributorInventory.Quantity -= item.Quantity;
+            distributorInventory.LastUpdated = DateTime.UtcNow;
+            
+            if (distributorInventory.Quantity < 0)
+            {
+                // This shouldn't happen if you have proper inventory checks before
+                distributorInventory.Quantity = 0;
+            }
+        }
+        // Note: If inventory record doesn't exist, it means the items were ordered from manufacturer
+        // and shipped directly to seller, so no inventory adjustment needed
+    }
+
+    await _context.SaveChangesAsync();
+}
+
 private async Task ProcessDistributorOrder(DistributorOrder order)
 {
     var orderItems = await _context.DistributorOrderItems
@@ -309,7 +343,7 @@ private async Task ProcessDistributorOrder(DistributorOrder order)
     {
         var distributorInventory = await _context.DistributorInventories
             .FirstOrDefaultAsync(di => di.DistributorId == order.DistributorId && 
-                                      di.BlanketModelId == item.BlanketModelId);
+                                    di.BlanketModelId == item.BlanketModelId);
 
         if (distributorInventory == null || distributorInventory.Quantity < item.Quantity)
         {

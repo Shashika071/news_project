@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { createOrder, getOrders } from '../../api/orderService';
 
 import CartDrawer from '../../components/customer/CartDrawer';
 import OrderHistory from '../../components/customer/OrderHistory';
-import { createOrder } from '../../api/orderService';
 import { getBlanketModels } from '../../api/blanketService';
+import { getSellers } from '../../api/usersService';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -16,10 +17,12 @@ const Shop = () => {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('shop');
+  const [sellers, setSellers] = useState([]);
   const { user } = useAuth();
 
   useEffect(() => {
     fetchBlanketModels();
+    fetchSellers();
   }, []);
 
   const fetchBlanketModels = async () => {
@@ -32,6 +35,16 @@ const Shop = () => {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSellers = async () => {
+    try {
+      const data = await getSellers();
+      setSellers(data);
+    } catch (error) {
+      console.error('Failed to fetch sellers:', error);
+      toast.error('Failed to load sellers');
     }
   };
 
@@ -95,34 +108,26 @@ const Shop = () => {
     );
   };
 
-  const handleCheckout = async () => {
-  try {
-    // Generate a simple order number (you can make this more sophisticated)
-    const orderNumber = `ORD-${Date.now()}`;
-    
-    const orderData = {
-      orderNumber: orderNumber,
-      status: "Pending", // Default status
-      sellerId: 15, // Default seller or implement seller selection
-      shippingAddress: user.address || '123 Main Street', // Default address if user.address is empty
-      contactPhone: user.phone || '0771234567', // Default phone if user.phone is empty
-      notes: "Please deliver carefully.", // Default note
-      orderItems: cartItems.map(item => ({
-        blanketModelId: item.id,
-        quantity: item.quantity,
-        unitPrice: item.retailPrice
-      }))
-    };
-    
-    await createOrder(orderData);
-    toast.success('Order placed successfully!');
-    setCartItems([]);
-    setIsCartOpen(false);
-  } catch (error) {
-    toast.error('Failed to place order');
-    console.error(error);
-  }
-};
+  const handleCheckout = async (orderData) => {
+    try {
+      const orderNumber = `ORD-${Date.now()}`;
+      
+      const completeOrderData = {
+        ...orderData,
+        orderNumber,
+        status: "Pending"
+      };
+      
+      await createOrder(completeOrderData);
+      toast.success('Order placed successfully!');
+      setCartItems([]);
+      setIsCartOpen(false);
+    } catch (error) {
+      toast.error('Failed to place order');
+      console.error(error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container-fluid py-5">
@@ -279,7 +284,6 @@ const Shop = () => {
                         alt={model.name}
                         style={{ height: '250px', objectFit: 'cover' }}
                       />
-                    
                     </div>
 
                     {/* Product Details */}
@@ -369,6 +373,8 @@ const Shop = () => {
             onRemove={handleRemoveFromCart}
             onUpdateQuantity={handleUpdateQuantity}
             onCheckout={handleCheckout}
+            sellers={sellers}
+            user={user}
           />
         </>
       ) : (

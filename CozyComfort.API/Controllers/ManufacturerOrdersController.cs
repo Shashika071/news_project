@@ -270,7 +270,7 @@ namespace CozyComfort.API.Controllers
                     return BadRequest($"Inventory record not found for blanket model {item.BlanketModelId}");
                 }
 
-                inventory.Quantity += item.Quantity;
+                inventory.Quantity -= item.Quantity;
                 inventory.LastUpdated = DateTime.UtcNow;
 
                 // Update production queue

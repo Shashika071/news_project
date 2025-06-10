@@ -77,56 +77,66 @@ namespace CozyComfort.API.Controllers
             }).ToList();
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<OrderResponseDTO>> GetOrder(int id)
+       [HttpGet("{id}")]
+public async Task<ActionResult<OrderResponseDTO>> GetOrder(int id)
+{
+    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+    var role = User.FindFirst(ClaimTypes.Role).Value;
+
+    var order = await _context.Orders
+        .Include(o => o.Seller)  // Still include seller
+        .Include(o => o.OrderItems)
+        .ThenInclude(oi => oi.BlanketModel)
+        .FirstOrDefaultAsync(o => o.Id == id);
+
+    if (order == null)
+    {
+        return NotFound();
+    }
+
+    // Authorization check
+    if ((role == "Customer" && order.CustomerId != userId) ||
+        (role == "Seller" && order.SellerId != userId))
+    {
+        return Forbid();
+    }
+
+    // Fetch customer separately if CustomerId exists
+    string customerName = "Customer";
+    if (order.CustomerId.HasValue)
+    {
+        var customer = await _context.Users
+            .Where(u => u.Id == order.CustomerId.Value)
+            .Select(u => new { u.Username, u.BusinessName })
+            .FirstOrDefaultAsync();
+
+        customerName = customer?.BusinessName ?? customer?.Username ?? "Customer";
+    }
+
+    return new OrderResponseDTO
+    {
+        Id = order.Id,
+        OrderNumber = order.OrderNumber,
+        OrderDate = order.OrderDate,
+        CustomerId = order.CustomerId,
+        CustomerName = customerName,  // Use the fetched name
+        SellerId = order.SellerId,
+        SellerName = order.Seller.BusinessName ?? order.Seller.Username,
+        Status = order.Status,
+        TotalAmount = order.TotalAmount,
+        ShippingAddress = order.ShippingAddress,
+        ContactPhone = order.ContactPhone,
+        Notes = order.Notes,
+        OrderItems = order.OrderItems.Select(oi => new OrderItemResponseDTO
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var role = User.FindFirst(ClaimTypes.Role).Value;
-
-            var order = await _context.Orders
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .Include(o => o.OrderItems)
-                .ThenInclude(oi => oi.BlanketModel)
-                .FirstOrDefaultAsync(o => o.Id == id);
-
-            if (order == null)
-            {
-                return NotFound();
-            }
-
-            // Authorization check
-            if ((role == "Customer" && order.CustomerId != userId) ||
-                (role == "Seller" && order.SellerId != userId))
-            {
-                return Forbid();
-            }
-
-            return new OrderResponseDTO
-            {
-                Id = order.Id,
-                OrderNumber = order.OrderNumber,
-                OrderDate = order.OrderDate,
-                CustomerId = order.CustomerId,
-                CustomerName = order.Customer?.BusinessName ?? order.Customer?.Username,
-                SellerId = order.SellerId,
-                SellerName = order.Seller.BusinessName ?? order.Seller.Username,
-                Status = order.Status,
-                TotalAmount = order.TotalAmount,
-                ShippingAddress = order.ShippingAddress,
-                ContactPhone = order.ContactPhone,
-                Notes = order.Notes,
-                OrderItems = order.OrderItems.Select(oi => new OrderItemResponseDTO
-                {
-                    BlanketModelId = oi.BlanketModelId,
-                    BlanketModelName = oi.BlanketModel.Name,
-                    Quantity = oi.Quantity,
-                    UnitPrice = oi.UnitPrice,
-                    TotalPrice = oi.Quantity * oi.UnitPrice
-                }).ToList()
-            };
-        }
-
+            BlanketModelId = oi.BlanketModelId,
+            BlanketModelName = oi.BlanketModel.Name,
+            Quantity = oi.Quantity,
+            UnitPrice = oi.UnitPrice,
+            TotalPrice = oi.Quantity * oi.UnitPrice
+        }).ToList()
+    };
+}
         [HttpPost]
         [Authorize(Roles = "Customer,Seller")]
         public async Task<ActionResult<OrderResponseDTO>> PostOrder(OrderDTO orderDTO)
@@ -213,43 +223,72 @@ namespace CozyComfort.API.Controllers
             });
         }
 
-        [HttpPut("{id}/status")]
-        public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] string status)
+      [HttpPut("{id}/status")]
+public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] string status)
+{
+    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+    var role = User.FindFirst(ClaimTypes.Role).Value;
+
+    // Include order items in the query
+    var order = await _context.Orders
+        .Include(o => o.OrderItems)
+        .FirstOrDefaultAsync(o => o.Id == id);
+    
+    if (order == null)
+    {
+        return NotFound();
+    }
+
+    // Authorization check
+    if ((role == "Customer" && order.CustomerId != userId) ||
+        (role == "Seller" && order.SellerId != userId))
+    {
+        return Forbid();
+    }
+
+    // Validate status transition
+    var validTransitions = new Dictionary<string, List<string>>
+    {
+        ["Pending"] = new List<string> { "Processing", "Cancelled" },
+        ["Processing"] = new List<string> { "Shipped", "Cancelled" },
+        ["Shipped"] = new List<string> { "Delivered" }
+    };
+
+    if (!validTransitions.ContainsKey(order.Status) || 
+        !validTransitions[order.Status].Contains(status))
+    {
+        return BadRequest("Invalid status transition");
+    }
+
+    // If status is being updated to "Delivered", reduce inventory
+    if (status == "Delivered" && order.Status != "Delivered")
+    {
+        foreach (var orderItem in order.OrderItems)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var role = User.FindFirst(ClaimTypes.Role).Value;
-
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
+            var inventory = await _context.SellerInventories
+                .FirstOrDefaultAsync(si => 
+                    si.SellerId == order.SellerId && 
+                    si.BlanketModelId == orderItem.BlanketModelId);
+            
+            if (inventory == null)
             {
-                return NotFound();
+                return BadRequest($"Inventory not found for product ID {orderItem.BlanketModelId}");
             }
 
-            // Authorization check
-            if ((role == "Customer" && order.CustomerId != userId) ||
-                (role == "Seller" && order.SellerId != userId))
+            if (inventory.Quantity < orderItem.Quantity)
             {
-                return Forbid();
+                return BadRequest($"Insufficient inventory for product ID {orderItem.BlanketModelId}. Available: {inventory.Quantity}, Requested: {orderItem.Quantity}");
             }
 
-            // Validate status transition
-            var validTransitions = new Dictionary<string, List<string>>
-            {
-                ["Pending"] = new List<string> { "Processing", "Cancelled" },
-                ["Processing"] = new List<string> { "Shipped", "Cancelled" },
-                ["Shipped"] = new List<string> { "Delivered" }
-            };
-
-            if (!validTransitions.ContainsKey(order.Status) || 
-                !validTransitions[order.Status].Contains(status))
-            {
-                return BadRequest("Invalid status transition");
-            }
-
-            order.Status = status;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            inventory.Quantity -= orderItem.Quantity;
+            inventory.LastUpdated = DateTime.UtcNow;
         }
+    }
+
+    order.Status = status;
+    await _context.SaveChangesAsync();
+
+    return NoContent();
+}
     }
 }
