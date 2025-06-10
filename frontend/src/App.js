@@ -12,6 +12,7 @@ import DistributorDashboard from './pages/distributor/Dashboard';
 import Login from './pages/auth/Login';
 import MainLayout from './components/layout/MainLayout';
 import ManufacturerDashboard from './pages/manufacturer/Dashboard';
+import ManufacturerOrderDetails from './components/manufacturer/ManufacturerOrderDetails';
 import Register from './pages/auth/Register';
 import SellerDashboard from './pages/seller/Dashboard';
 import { Toaster } from 'react-hot-toast';
@@ -39,6 +40,7 @@ const App = () => {
             <Route path="/auth" element={<AuthLayout />}>
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />
+            
             </Route>
 
             {/* Protected routes */}
@@ -48,6 +50,7 @@ const App = () => {
               <Route path="distributor/*" element={<DistributorRoutes />} />
               <Route path="seller/*" element={<SellerRoutes />} />
               <Route path="shop" element={<CustomerShop />} />
+              <Route path="/manufacturer-orders/:id" element={<ManufacturerOrderDetails />} />
             </Route>
           </Routes>
         </AuthProvider>
@@ -85,7 +88,7 @@ const ManufacturerRoutes = () => {
   return (
     <Routes>
       <Route path="dashboard" element={<ManufacturerDashboard />} />
-      {/* Add more manufacturer routes here */}
+      
     </Routes>
   );
 };

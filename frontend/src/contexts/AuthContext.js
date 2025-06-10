@@ -16,8 +16,16 @@ export const AuthProvider = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          const userData = await getCurrentUser();
-          setUser(userData);
+          // First verify the token structure before making API call
+          const decoded = decodeToken(token);
+          if (decoded && decoded.exp * 1000 > Date.now()) {
+            // Token is valid, fetch user data
+            const userData = await getCurrentUser();
+            setUser(userData);
+          } else {
+            // Token is expired or invalid
+            localStorage.removeItem('token');
+          }
         }
       } catch (error) {
         console.error('Failed to authenticate', error);
@@ -29,6 +37,25 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
   }, []);
+
+  // Add useEffect to handle navigation after auth state is initialized
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        // If user is logged in, redirect to appropriate dashboard
+        const homeRoute = getHomeRoute(user.role);
+        if (window.location.pathname === '/auth/login' || 
+            window.location.pathname === '/auth/register') {
+          navigate(homeRoute);
+        }
+      } else {
+        // If no user and not on auth pages, redirect to login
+        if (!window.location.pathname.startsWith('/auth')) {
+          navigate('/auth/login');
+        }
+      }
+    }
+  }, [user, loading, navigate]);
 
   const login = async (credentials) => {
     try {
@@ -75,7 +102,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

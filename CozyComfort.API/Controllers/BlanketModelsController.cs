@@ -68,47 +68,47 @@ namespace CozyComfort.API.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Manufacturer")]
-        public async Task<ActionResult<BlanketModelDTO>> PostBlanketModel(BlanketModelDTO blanketModelDTO)
-        {
-            var blanketModel = new BlanketModel
-            {
-                Name = blanketModelDTO.Name,
-                Description = blanketModelDTO.Description,
-                Material = blanketModelDTO.Material,
-                Size = blanketModelDTO.Size,
-                Weight = blanketModelDTO.Weight,
-                ManufacturerPrice = blanketModelDTO.ManufacturerPrice,
-                RetailPrice = blanketModelDTO.RetailPrice,
-                ImageUrl = blanketModelDTO.ImageUrl,
-                IsActive = blanketModelDTO.IsActive
-            };
+[Authorize(Roles = "Manufacturer")]
+public async Task<ActionResult<BlanketModelDTO>> PostBlanketModel(BlanketModelDTO blanketModelDTO)
+{
+    var blanketModel = new BlanketModel
+    {
+        Name = blanketModelDTO.Name,
+        Description = blanketModelDTO.Description,
+        Material = blanketModelDTO.Material,
+        Size = blanketModelDTO.Size,
+        Weight = blanketModelDTO.Weight,
+        ManufacturerPrice = blanketModelDTO.ManufacturerPrice,
+        RetailPrice = blanketModelDTO.RetailPrice,
+        ImageUrl = blanketModelDTO.ImageUrl,
+        IsActive = blanketModelDTO.IsActive
+    };
 
-            _context.BlanketModels.Add(blanketModel);
-            await _context.SaveChangesAsync();
+    _context.BlanketModels.Add(blanketModel);
+    await _context.SaveChangesAsync();
 
-            // Create inventory entry
-            var inventory = new ManufacturerInventory
-            {
-                BlanketModelId = blanketModel.Id,
-                Quantity = 0
-            };
-            _context.ManufacturerInventories.Add(inventory);
+    // Create inventory entry with initial quantity (you can modify this as needed)
+    var inventory = new ManufacturerInventory
+    {
+        BlanketModelId = blanketModel.Id,
+        Quantity = 100 // Set your desired initial quantity here
+    };
+    _context.ManufacturerInventories.Add(inventory);
 
-            // Create production capacity entry
-            var capacity = new ProductionCapacity
-            {
-                BlanketModelId = blanketModel.Id,
-                DailyCapacity = 100 // Default capacity
-            };
-            _context.ProductionCapacities.Add(capacity);
+    // Create production capacity entry
+    var capacity = new ProductionCapacity
+    {
+        BlanketModelId = blanketModel.Id,
+        DailyCapacity = 100, // Default capacity
+        CurrentProductionQueue = 0
+    };
+    _context.ProductionCapacities.Add(capacity);
 
-            await _context.SaveChangesAsync();
+    await _context.SaveChangesAsync();
 
-            blanketModelDTO.Id = blanketModel.Id;
-            return CreatedAtAction(nameof(GetBlanketModel), new { id = blanketModel.Id }, blanketModelDTO);
-        }
-
+    blanketModelDTO.Id = blanketModel.Id;
+    return CreatedAtAction(nameof(GetBlanketModel), new { id = blanketModel.Id }, blanketModelDTO);
+}
         [HttpPut("{id}")]
         [Authorize(Roles = "Manufacturer")]
         public async Task<IActionResult> PutBlanketModel(int id, BlanketModelDTO blanketModelDTO)

@@ -71,25 +71,31 @@ namespace CozyComfort.API.Controllers
                 .ToListAsync();
         }
 
-        [HttpPut("manufacturer/{blanketModelId}")]
-        [Authorize(Roles = "Manufacturer")]
-        public async Task<IActionResult> UpdateManufacturerInventory(int blanketModelId, [FromBody] int quantity)
-        {
-            var inventory = await _context.ManufacturerInventories
-                .FirstOrDefaultAsync(mi => mi.BlanketModelId == blanketModelId);
+        public class QuantityUpdateDto
+{
+    public int Quantity { get; set; }
+}
 
-            if (inventory == null)
-            {
-                return NotFound();
-            }
+[HttpPut("manufacturer/{blanketModelId}")]
+[Authorize(Roles = "Manufacturer")]
+public async Task<IActionResult> UpdateManufacturerInventory(int blanketModelId, [FromBody] QuantityUpdateDto request)
+{
+    var inventory = await _context.ManufacturerInventories
+        .FirstOrDefaultAsync(mi => mi.BlanketModelId == blanketModelId);
 
-            inventory.Quantity = quantity;
-            inventory.LastUpdated = DateTime.UtcNow;
+    if (inventory == null)
+    {
+        return NotFound();
+    }
 
-            await _context.SaveChangesAsync();
+    inventory.Quantity = request.Quantity;
+    inventory.LastUpdated = DateTime.UtcNow;
 
-            return NoContent();
-        }
+    await _context.SaveChangesAsync();
+
+    return NoContent();
+}
+
 
         [HttpPut("distributor/{blanketModelId}")]
         [Authorize(Roles = "Distributor")]
